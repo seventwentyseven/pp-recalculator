@@ -11,22 +11,22 @@ pub struct User {
 impl User {
     pub async fn fetch_all(pool: &Pool<MySql>) -> Vec<User> {
         // Using pool to fetch all users
+        let start = std::time::Instant::now();
         let rows = pool
             .fetch_all("SELECT id, name, priv, country FROM users")
             .await
-            .unwrap();
+            .unwrap()
+            .into_iter();
+        println!("Query took {:?}", std::time::Instant::now() - start);
 
-        let mut users = Vec::new();
-
-        for row in rows {
-            let user = User {
-                id: row.try_get("id").unwrap(),
-                name: row.try_get("name").unwrap(),
-                privileges: row.try_get("priv").unwrap(),
-                country: row.try_get("country").unwrap(),
-            };
-            users.push(user);
-        }
+        let users = rows
+            .map(|row| User {
+                id: row.get("id"),
+                name: row.get("name"),
+                privileges: row.get("priv"),
+                country: row.get("country"),
+            })
+            .collect();
 
         return users;
     }

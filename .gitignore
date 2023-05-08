@@ -21,3 +21,7 @@ Cargo.lock
 
 # Config
 config.yml
+
+# Ignore test files
+testfiles/*
+!testfiles/README.md

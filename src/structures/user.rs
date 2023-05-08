@@ -9,15 +9,6 @@ pub struct User {
     pub country: String,
 }
 impl User {
-    pub fn new(id: i32, name: String, privileges: i32, country: String) -> Self {
-        Self {
-            id,
-            name,
-            privileges,
-            country,
-        }
-    }
-
     pub async fn fetch_all(pool: &Pool<MySql>) -> Vec<User> {
         // Using pool to fetch all users
         let rows = pool

@@ -3,9 +3,13 @@ mod structures;
 
 use akatsuki_pp::{Beatmap, BeatmapExt, Mods};
 use config::CONFIG;
-use sqlx::mysql::{MySqlPool, MySqlPoolOptions};
+use sqlx::{
+    mysql::{MySqlPool, MySqlPoolOptions},
+    Executor,
+};
 use std::collections::HashMap;
-use structures::user::{User, Users};
+use structures::user::User;
+use tokio::time::Instant;
 
 lazy_static::lazy_static! {
     pub static ref BMAPCACHE: HashMap<u32, Beatmap> = HashMap::new();
@@ -37,9 +41,10 @@ async fn main() {
     let pool = init_sql().await.expect("Failed to connect to database");
 
     // Fetch all users from the database
-    let users = Users::fetch(&pool).await.expect("Failed to fetch users");
-
-    println!("Fetched {:?} users", users);
+    let start = Instant::now();
+    let users = User::fetch_all(&pool).await;
+    let end = Instant::now();
+    println!("Fetched {} users in {:?}", users.len(), end - start);
 }
 
 // fn recalculate(score: &structures::score::Score, bmap: &Beatmap) {

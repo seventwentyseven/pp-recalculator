@@ -13,12 +13,14 @@ pub struct MySQL {
 }
 
 #[derive(Deserialize)]
+#[allow(non_snake_case)]
 pub struct Main {
     pub path: String,
     pub ppSystem: i8,
 }
 
 #[derive(Deserialize)]
+#[allow(non_snake_case)]
 pub struct Config {
     pub MySQL: MySQL,
     pub Main: Main,

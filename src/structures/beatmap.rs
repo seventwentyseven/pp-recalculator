@@ -25,14 +25,11 @@ pub struct Beatmap {
 
 impl Beatmap {
     pub async fn fetch_all(pool: &Pool<MySql>) -> Vec<Beatmap> {
-        // Using pool to fetch all maps
-        let start = std::time::Instant::now();
         let rows = pool
             .fetch_all("SELECT set_id, id, md5, status, frozen, total_length, max_combo, mode, bpm, ar, od, cs, hp, diff FROM maps")
             .await
             .unwrap()
             .into_iter();
-        println!("Query took {:?}", std::time::Instant::now() - start);
 
         let maps = rows
             .map(|row| Beatmap {

@@ -74,11 +74,29 @@ async fn relac_maps(pool: &Pool<MySql>, spinner: &ProgressStyle) {
     pb.set_prefix("[2/5]");
     pb.set_message(format!("{}Recalculating Beatmaps...", BEATMAP));
 
+    // Recalc code
     for map in maps {
+        println!("{}", map.id);
+        // Try to set map.bmap_obj with AkatBmap::from_path(&path + map.id);
+        // Construct path to the beatmap
+        let map_path = format!("{}/osu/{}.osu", &CONFIG.Main.path, map.id);
+        let mut bmap_obj = match AkatBmap::from_path(&map_path) {
+            Ok(bmap) => bmap,
+            Err(error) => {
+                // TODO: Implement force fetching from osu then kitsu, if none skip and leave log
+                // pb.println(format!(
+                //     "{}Failed to fetch beatmap with id {}",
+                //     FAILED, map.id
+                // ));
+                println!("{}Failed to fetch beatmap with id {}", FAILED, map.id);
+                continue;
+            }
+        };
+
         pb.inc(1);
-        thread::sleep(Duration::from_micros(2000));
     }
 
+    // Continue with the rest of pb code
     pb.set_style(ProgressStyle::with_template("{prefix:.bold.dim} {wide_msg}").unwrap());
     pb.set_prefix("[2/5]");
     pb.finish_with_message(format!(
@@ -101,5 +119,6 @@ async fn main() {
     let pool = init_sql().await.unwrap();
 
     // Recalc maps
-    relac_maps(&pool, &spinner_style).await;
+    // ! Turned off until we find reliable fix for missing .osu files that won't spam someone's API
+    // relac_maps(&pool, &spinner_style).await;
 }

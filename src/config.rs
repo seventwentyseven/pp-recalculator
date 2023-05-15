@@ -17,6 +17,7 @@ pub struct MySQL {
 pub struct Main {
     pub path: String,
     pub ppSystem: i8,
+    pub osuApiKey: String,
 }
 
 #[derive(Deserialize)]

@@ -1,18 +1,20 @@
+use crate::statics::HttpClient;
 use sqlx::{Executor, MySql, Pool, Row};
+use tokio::{fs::File, io::AsyncWriteExt};
 
 #[derive(Debug, Clone)]
 pub struct Beatmap {
     // Meta
-    pub set_id: i32,
-    pub id: i32,
+    pub set_id: u32,
+    pub id: u32,
     pub md5: String,
-    pub status: i32,
+    pub status: u32,
     pub frozen: bool,
 
     // Attributes
-    pub total_length: i32,
-    pub max_combo: i32,
-    pub mode: i32,
+    pub total_length: u32,
+    pub max_combo: u32,
+    pub mode: u8,
     pub bpm: f32,
     pub ar: f32,
     pub od: f32,
@@ -26,15 +28,15 @@ pub struct Beatmap {
 impl Beatmap {
     pub async fn fetch_all(pool: &Pool<MySql>) -> Vec<Beatmap> {
         let rows = pool
-            .fetch_all("SELECT set_id, id, md5, status, frozen, total_length, max_combo, mode, bpm, ar, od, cs, hp, diff FROM maps")
+            .fetch_all("SELECT id, set_id, md5, status, frozen, total_length, max_combo, mode, bpm, ar, od, cs, hp, diff FROM maps")
             .await
             .unwrap()
             .into_iter();
 
         let maps = rows
             .map(|row| Beatmap {
-                set_id: row.get("set_id"),
                 id: row.get("id"),
+                set_id: row.get("set_id"),
                 md5: row.get("md5"),
                 status: row.get("status"),
                 frozen: row.get("frozen"),
@@ -52,5 +54,34 @@ impl Beatmap {
             .collect();
 
         return maps;
+    }
+
+    pub async fn get_osu_file(map_id: u32) -> Result<(), Box<dyn std::error::Error>> {
+        // Try to get the map file from the osu.direct API
+
+        let response = HttpClient
+            .get(format!("https://catboy.best/osu/{}", map_id))
+            .send()
+            .await?;
+
+        // println!("{:?}", response);
+
+        // If failed to get the file or the response is 404, return an empty vector
+        if response.status().is_success() {
+            // Since the response is text/plain, just return the string (ignore the error)
+            let text = response.text().await.unwrap();
+
+            // Save the file to disk
+            let file_path = format!("/opt/pp-recalculator/testfiles/downloads/{}.osu", map_id);
+            let mut file = File::create(file_path).await?;
+            file.write_all(text.as_bytes()).await?;
+            Ok(())
+        } else {
+            // There was an error or the response was 404
+            Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Failed to fetch map file",
+            )))
+        }
     }
 }

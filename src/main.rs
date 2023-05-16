@@ -60,41 +60,6 @@ async fn init_sql() -> Result<MySqlPool, sqlx::Error> {
     Ok(pool)
 }
 
-async fn relac_maps(pool: &Pool<MySql>) {
-    let start = Instant::now();
-    let maps = Beatmap::fetch_all(&pool).await;
-    let pb = ProgressBar::new(maps.len() as u64);
-    let style = ProgressStyle::default_bar()
-        .progress_chars("█▓▒░ ")
-        .template(
-        "{prefix:.bold.dim} 🎵 Getting Missing Maps | {bar:40.white} | {pos}/{len} | ETA: {eta}",
-    );
-    pb.set_style(style.unwrap());
-    pb.set_prefix("[2/5]");
-    pb.set_message(format!("{}Getting missing maps...", BEATMAP));
-
-    // Recalc code
-    for mut map in maps {
-        // Try to set map.bmap_obj with AkatBmap::from_path(&path + map.id);
-        // Construct path to the beatmap
-        pb.inc(1);
-        let bmap_obj =
-            match AkatBmap::from_path(format!("{}/osu/{}.osu", &CONFIG.Main.path, map.id).as_str())
-            {
-                Ok(bmap) => bmap,
-                Err(_) => {
-                    continue;
-                }
-            };
-
-        // Set map.bmap_obj
-        map.bmap_obj = Some(bmap_obj);
-
-        // Check if file exists @ map_path
-    }
-    println!("Done in {}", HumanDuration(start.elapsed()));
-}
-
 async fn download_missing_maps(pool: &Pool<MySql>) {
     // Get maps from db
     let maps: Vec<Beatmap> = Beatmap::fetch_all(&pool).await;
@@ -112,10 +77,10 @@ async fn download_missing_maps(pool: &Pool<MySql>) {
     let style = ProgressStyle::default_bar()
         .progress_chars("█▓▒░ ")
         .template(
-        "{prefix:.bold.dim} 🎵 Downloading Missing Maps| {bar:40.white} | {pos}/{len} | ETA: {eta}",
+        "{prefix:.bold.dim} 🎵 Downloading Missing Maps | {bar:40.white} | {pos}/{len} | ETA: {eta}",
     );
     pb.set_style(style.unwrap());
-    pb.set_prefix("[2/5]");
+    pb.set_prefix("[2/8]");
 
     // Concurrent downloads to speed up the process
     let concurrency_limit = 4;
@@ -144,6 +109,41 @@ async fn download_missing_maps(pool: &Pool<MySql>) {
     pb.finish();
 }
 
+async fn recalc_maps(pool: &Pool<MySql>) {
+    let start = Instant::now();
+    let maps = Beatmap::fetch_all(&pool).await;
+    let pb = ProgressBar::new(maps.len() as u64);
+    let style = ProgressStyle::default_bar()
+        .progress_chars("█▓▒░ ")
+        .template(
+        "{prefix:.bold.dim} 🎵 Preforming Beatmap Recalculation | {bar:40.white} | {pos}/{len} | ETA: {eta}",
+    );
+    pb.set_style(style.unwrap());
+    pb.set_prefix("[3/8]");
+
+    // Recalc code
+    for mut map in maps {
+        // Try to set map.bmap_obj with AkatBmap::from_path(&path + map.id);
+        // Construct path to the beatmap
+        pb.inc(1);
+        let bmap_obj =
+            match AkatBmap::from_path(format!("{}/osu/{}.osu", &CONFIG.Main.path, map.id).as_str())
+            {
+                Ok(bmap) => bmap,
+                Err(_) => {
+                    // Try to get that missing map
+                    continue;
+                }
+            };
+
+        // Set map.bmap_obj
+        map.bmap_obj = Some(bmap_obj);
+
+        // Check if file exists @ map_path
+    }
+    println!("Done in {}", HumanDuration(start.elapsed()));
+}
+
 #[tokio::main]
 async fn main() {
     // NOTE: That ref passing to unrelated functions is dumb as fuck, change it in future
@@ -157,6 +157,7 @@ async fn main() {
     download_missing_maps(&pool).await;
 
     // Relcalc Maps
+    recalc_maps(&pool).await;
 
     // let res = Beatmap::get_osu_file(75 as u32).await;
     // println!("{:?}", res)

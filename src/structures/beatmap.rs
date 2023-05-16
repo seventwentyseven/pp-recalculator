@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use crate::statics::HttpClient;
 use sqlx::{Executor, MySql, Pool, Row};
 use tokio::{
@@ -62,7 +60,7 @@ impl Beatmap {
     }
 
     pub async fn get_osu_file(map_id: u32) -> Result<(), Box<dyn std::error::Error>> {
-        // Try to get the map file from the osu.direct API
+        // TODO: Add kitsu.moe mirror and if it fails, use osu api
 
         let response = HttpClient
             .get(format!("https://catboy.best/osu/{}", map_id))

@@ -1,6 +1,11 @@
+use std::time::Duration;
+
 use crate::statics::HttpClient;
 use sqlx::{Executor, MySql, Pool, Row};
-use tokio::{fs::File, io::AsyncWriteExt};
+use tokio::{
+    fs::{File, OpenOptions},
+    io::AsyncWriteExt,
+};
 
 #[derive(Debug, Clone)]
 pub struct Beatmap {
@@ -72,12 +77,29 @@ impl Beatmap {
             let text = response.text().await.unwrap();
 
             // Save the file to disk
-            let file_path = format!("/opt/pp-recalculator/testfiles/downloads/{}.osu", map_id);
+            let file_path = format!("/opt/gug/.data/osu/{}.osu", map_id);
             let mut file = File::create(file_path).await?;
             file.write_all(text.as_bytes()).await?;
             Ok(())
         } else {
-            // There was an error or the response was 404
+            // Save log to /opt/err.log
+            // TODO: Allow changing the log path in config
+            let mut file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("/opt/err.log")
+                .await?;
+            file.write_all(
+                format!(
+                    "Failed to fetch map file for map ID ;{};, Error: {}\n",
+                    map_id,
+                    response.text().await.unwrap()
+                )
+                .as_bytes(),
+            )
+            .await?;
+
+            // Return error
             Err(Box::new(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 "Failed to fetch map file",

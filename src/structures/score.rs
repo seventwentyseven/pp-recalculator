@@ -22,18 +22,3 @@ pub struct Score {
     pub perfect: bool,
     pub grade: String,
 }
-
-pub struct ScoreList {
-    pub scores: Vec<Score>,
-}
-impl ScoreList {
-    pub fn new() -> Self {
-        Self { scores: Vec::new() }
-    }
-    pub fn push(&mut self, score: Score) {
-        self.scores.push(score);
-    }
-    pub fn len(&self) -> usize {
-        self.scores.len()
-    }
-}

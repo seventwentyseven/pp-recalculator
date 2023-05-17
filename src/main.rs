@@ -2,7 +2,6 @@ mod config;
 mod statics;
 mod structures;
 
-use std::println;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -13,6 +12,7 @@ use console::Emoji;
 use futures::stream::{FuturesUnordered, StreamExt};
 use indicatif::{HumanDuration, ProgressBar, ProgressStyle};
 use sqlx::{mysql::MySqlPoolOptions, MySql, MySqlPool, Pool};
+use statics::BEATMAP_CACHE;
 use tokio::sync::Semaphore;
 
 static BEATMAP: Emoji<'_, '_> = Emoji("🎵 ", "");
@@ -72,6 +72,10 @@ async fn download_missing_maps(pool: &Pool<MySql>) {
             continue;
         }
     }
+    if missing.len() == 0 {
+        println!("No missing maps found!");
+        return;
+    }
 
     let pb = ProgressBar::new(missing.len() as u64);
     let style = ProgressStyle::default_bar()
@@ -83,7 +87,7 @@ async fn download_missing_maps(pool: &Pool<MySql>) {
     pb.set_prefix("[2/8]");
 
     // Concurrent downloads to speed up the process
-    let concurrency_limit = 4;
+    let concurrency_limit = 8;
     let sem = Arc::new(Semaphore::new(concurrency_limit));
     let mut futures = FuturesUnordered::new();
 
@@ -122,34 +126,56 @@ async fn recalc_maps(pool: &Pool<MySql>) {
     pb.set_prefix("[3/8]");
 
     // Recalc code
+    let concurrency_limit = 24;
+    let sem = Arc::new(Semaphore::new(concurrency_limit));
+    let mut futures = FuturesUnordered::new();
     for mut map in maps {
-        // Try to set map.bmap_obj with AkatBmap::from_path(&path + map.id);
-        // Construct path to the beatmap
-        pb.inc(1);
-        let bmap_obj =
-            match AkatBmap::from_path(format!("{}/osu/{}.osu", &CONFIG.Main.path, map.id).as_str())
-            {
+        let sem_clone = Arc::clone(&sem);
+        let fut = async move {
+            let _permit = sem_clone.acquire().await.unwrap();
+
+            let mut bmap_obj = match AkatBmap::from_path(
+                format!("{}/osu/{}.osu", &CONFIG.Main.path, map.id).as_str(),
+            ) {
                 Ok(bmap) => bmap,
                 Err(_) => {
-                    // Try to get that missing map
-                    continue;
+                    //TODO: Try to get that missing map instead of skipping
+                    return;
                 }
             };
 
-        // Set map.bmap_obj
-        map.bmap_obj = Some(bmap_obj);
+            // Calculate new stars, round to 3 decimal places
+            let stars_new = (bmap_obj.stars().calculate().stars() * 1000.0).round() / 1000.0;
 
-        // Check if file exists @ map_path
+            // Execute query
+            let query = format!("UPDATE maps SET diff = {} WHERE id = {}", stars_new, map.id);
+            match sqlx::query(&query).execute(pool).await {
+                Ok(_) => {}
+                Err(err) => {
+                    println!("Failed to update map with id {}, {}", map.id, err);
+                    return;
+                }
+            };
+        };
+        // Cache map in static cache
+        // map.diff = stars_new as f32; // is it safe?
+        // map.bmap_obj = Some(bmap_obj);
+        // BEATMAP_CACHE.insert(map.id.clone(), map.clone());
+
+        futures.push(fut);
+
+        // Cache map in static cache
     }
+
+    while let Some(_) = futures.next().await {
+        pb.inc(1);
+    }
+
     println!("Done in {}", HumanDuration(start.elapsed()));
 }
 
 #[tokio::main]
 async fn main() {
-    // NOTE: That ref passing to unrelated functions is dumb as fuck, change it in future
-    // TODO: Change exception message style to match rest of the code
-    let started = std::time::Instant::now();
-
     // Connect to the database
     let pool = init_sql().await.unwrap();
 
@@ -158,7 +184,4 @@ async fn main() {
 
     // Relcalc Maps
     recalc_maps(&pool).await;
-
-    // let res = Beatmap::get_osu_file(75 as u32).await;
-    // println!("{:?}", res)
 }

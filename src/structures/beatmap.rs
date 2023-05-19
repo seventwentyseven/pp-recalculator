@@ -71,7 +71,6 @@ impl Beatmap {
 
         // If failed to get the file or the response is 404, return an empty vector
         if response.status().is_success() {
-            // Since the response is text/plain, just return the string (ignore the error)
             let text = response.text().await.unwrap();
 
             // Save the file to disk

@@ -1,6 +1,6 @@
 use clap::Parser;
 
-# ja gdy ja 
+// ja gdy ja 
 #[derive(Parser, Debug)]
 #[clap(name = "Akatsuki PP", version = "0.1.0")]
 pub struct Args {
